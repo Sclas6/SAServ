@@ -1,6 +1,6 @@
 from Room import Room
 
-class chatRoom:
+class RoomManager:
     rooms=0
     room_list=[]
     def __init__(self):
@@ -9,13 +9,14 @@ class chatRoom:
     def createRoom(self,name,user,pwd):
         if self.searchRoom(name)==None:
             r = Room(name,user,pwd)
-            chatRoom.rooms+=1
-            chatRoom.room_list.append(r)
+            RoomManager.rooms+=1
+            RoomManager.room_list.append(r)
+            print(f"[ROOM]   CREATE: NAME:{r.name} CREATOR:{r.user1} [{self.rooms}]")
             return r
         return None
 
     def searchRoom(self,name):
-        for i in chatRoom.room_list:
+        for i in RoomManager.room_list:
             if i.name==name:
                 return i
         return None
@@ -25,6 +26,7 @@ class chatRoom:
         if target!=None:
             if target.num<2:
                 if target.joinRoom(user,pwd)==True:
+                    print(f"[ROOM]   JOIN  : ROOM:{room} JOIN:{user}")
                     return True
         return False
     
@@ -34,6 +36,7 @@ class chatRoom:
     def exitRoom(self,name):
         target=self.searchRoom(name)
         if target!=None:
+            print(f"[ROOM]   EXIT  : ROOM:{name} NAME:{target.user2}")
             target.num=1
             target.user2=None
             return True
@@ -42,9 +45,10 @@ class chatRoom:
     def closeRoom(self,name):
         target=self.searchRoom(name)
         if target!=None:
-            chatRoom.rooms-=1
-            chatRoom.room_list.remove(target)
+            RoomManager.rooms-=1
+            RoomManager.room_list.remove(target)
             del self
+            print(f"[ROOM]   CLOSE : NAME:{name}")
             return True
         return False
     

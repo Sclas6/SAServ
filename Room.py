@@ -5,7 +5,8 @@ class Room:
         self.user2=None
         self.num=1
         self.pwd=pwd
-        self.ctr="ctr l_0"
+        self.ctr="ctr [2,1,0]"
+        self.msg=""
     
     def __repr__(self):
         #解釈しやすい名前にする

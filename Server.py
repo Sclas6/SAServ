@@ -3,10 +3,10 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
 
-from chatRoom import chatRoom as RoomList
+from RoomManager import RoomManager as RoomList
 
 #ip=socket.gethostbyname(socket.gethostname())
-ip="10.75.120.171"
+ip="127.0.0.1"
 print(ip)
 port=19071
 rl=RoomList()
@@ -14,7 +14,6 @@ rl=RoomList()
 def createRoom(name,user,pwd):
     r=rl.createRoom(name,user,pwd)
     if(r!=None):
-        print(f"[CREATE] *{rl.rooms} NAME:{r.name} CREATOR:{r.user1}")
         return True
     return False
 #'''
@@ -61,7 +60,7 @@ def checkTokens(list):
         return result
 
     except Exception as e:
-        print(e)
+        print(f"[ERROR] can't resolve token: {e}")
         return None
 
 def saChat(conn):
@@ -70,11 +69,11 @@ def saChat(conn):
     matched=False
     defence=False
     end=False
-    print(f"[*] Thread: {threading.currentThread().getName()}",flush=True)
+    print(f"[THREAD] CREATE: {threading.currentThread().getName()}",flush=True)
     while end==False:
-        print("[debug] start roop_main")
+        #print("[debug] start roop_main")
         while matched==False:
-            print("[debug] start roop_menu")
+            #print("[debug] start roop_menu")
             try:
                 conn.settimeout(120.0)
                 data = conn.recv(buf).decode('utf-8')
@@ -94,7 +93,7 @@ def saChat(conn):
                     conn.send(bytes(shapeMsg(showRooms()),"utf-8"))
                 elif tokens[0]=="quit":
                     conn.send(bytes(shapeMsg("end connection"),"utf-8"))
-                    print("[debug] recv quit")
+                    #print("[debug] recv quit")
                     end=True
                     break
                 elif tokens[0]=="create"and (len(tokens)==3 or len(tokens)==4):
@@ -113,8 +112,9 @@ def saChat(conn):
                                 conn.setblocking(False)
                                 if(conn.recv(1024).decode("utf-8").split()[1]=="exit"):
                                     rl.closeRoom(room.name)
-                                    #conn.send(bytes(shapeMsg(f"acc"),"utf-8"))
+                                    end = True
                                     break
+                                    #conn.send(bytes(shapeMsg(f"acc"),"utf-8"))
                                 conn.setblocking(True)
                             except Exception as e:
                                 pass
@@ -158,13 +158,13 @@ def saChat(conn):
                 else:
                     conn.send(bytes(shapeMsg(f"err unknown_command"),"utf-8"))
             except socket.error as e:
-                print(f"SOCKET ERROR:{e}")
+                print(f"[ERROR] SOCKET ERROR: {e}")
                 rl.closeRoom(room.name)
                 break
         # Matching True
-        print("[debug] end matching roop")
-        while defence==False and matched==True:
-            print("[debug] start attack roop")
+        #print("[debug] end matching roop")
+        while defence==False and matched==True and end == False:
+            #print("[debug] start attack roop")
             if rl.searchRoom(room.name)==None:
                 matched=False
                 conn.send(bytes(shapeMsg(f"err disconnected"),"utf-8"))
@@ -184,8 +184,8 @@ def saChat(conn):
                     end=True
                     break
                 if tokens[0]=="exit":
-                    print("[debug] exit room")
-                    rl.setCtr(room.name,"ctr l_0")
+                    #print("[debug] exit room")
+                    rl.setCtr(room.name,"ctr [2,1,0]")
                     rl.exitRoom(room.name)
                     matched=False
                     break
@@ -194,22 +194,28 @@ def saChat(conn):
                 else:
                     end=True
                     break
-                print(f"[ROOM] {room.name}_ctr:{room.ctr}")
+                #print(f"[ROOM] {room.name}_ctr:{room.ctr}")
             except socket.error as e:
-                print(f"SOCKET ERROR:{e}")
-                rl.setCtr(room.name,"ctr l_0")
+                print(f"[ERROR] SOCKET ERROR: {e}")
+                rl.setCtr(room.name,"ctr [2,1,0]")
                 end=True
                 rl.exitRoom(room.name)
                 break
-        c_prev=None
+        c_prev="ctr [2,1,0]"
         i=0
-        while defence==True and matched==True:
+        while defence==True and matched==True and end == False:
             #切断の検知
             try:
                 conn.setblocking(False)
-                if len(conn.recv(1024).decode("utf-8").split())==0:
+                msg = conn.recv(1024).decode("utf-8")
+                if msg=="":
                     rl.closeRoom(room.name)
                     end=True
+                    break
+                tokens = msg.split()
+                if checkTokens(tokens)[0]=="exit":
+                    rl.closeRoom(room.name)
+                    matched = False
                     break
                 else:
                     pass
@@ -225,41 +231,39 @@ def saChat(conn):
             c=rl.getCtr(room.name)
             try:
                 if c!=c_prev:
-                    print("[debug] ctr updated")
+                    #print("[debug] ctr updated")
                     conn.send(bytes(shapeMsg(f"ctr {c}"),"utf-8"))
                     c_prev=c
                     i=0
                 sleep(0.01)
                 i+=1
             except socket.error as e:
-                print(f"SOCKET ERROR:{e}")
+                print(f"[ERROR] SOCKET ERROR:{e}")
                 rl.closeRoom(room.name)
                 break
-            if i>1200:
+            if i>120000:
                 conn.send(bytes(shapeMsg(f"err TIMED_OUT {i}"),"utf-8"))
                 rl.closeRoom(room.name)
                 matched=False
                 break
-    print("[debug] end one roop")
+    #print("[debug] end one roop")
     if room!=None:
         if defence==True:
             rl.closeRoom(room.name)
         else:
             rl.exitRoom(room.name)
-    print(f"[{threading.currentThread().getName()} CLOSED]")
+    print(f"[THREAD] CLOSE: {threading.currentThread().getName()}]")
 
 def main():
     s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
     s.bind((ip,port))
     s.listen(socket.SOMAXCONN)
-    createRoom("Room1","User1",None)
-    createRoom("Room2","User2","pass")
-    createRoom("Room3","User3","word")
-    rl.joinRoom("Room3","UserT","word")
+    createRoom("TestRoom","TestUser",None)
+    rl.joinRoom("TestRoom","TestUser2",None)
     with ThreadPoolExecutor(max_workers=100) as executor:
         while True:
             conn,addr = s.accept()
-            print("[*] Connected!! [ Source : {}]".format(addr),flush=True)
+            print(f"[SOCKET] CONNECT: {addr}]",flush=True)
             executor.submit(saChat,conn)
 
 if __name__=='__main__':
