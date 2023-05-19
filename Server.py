@@ -2,21 +2,13 @@ import socket
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
-
 from RoomManager import RoomManager as RoomList
 
-#ip=socket.gethostbyname(socket.gethostname())
-ip="127.0.0.1"
+ip = "157.7.214.224"
 print(ip)
-port=19071
-rl=RoomList()
-#'''
-def createRoom(name,user,pwd):
-    r=rl.createRoom(name,user,pwd)
-    if(r!=None):
-        return True
-    return False
-#'''
+port = 19071
+rl = RoomList()
+
 def showRooms():
     msg=""
     for i in RoomList.room_list:
@@ -32,33 +24,20 @@ def shapeMsg(msg):
 
 def checkTokens(list):
     try:
+        if len(list)==0:
+            return list
         datalen=len(list)-2
         for i in list[1:]:
             datalen+=len(i)
-        """    
-        if(int(list[0])==datalen):
-            for i in range(len(list)-1):
-                list[i]=list[i+1]
-            del list[-1]
-            return list
-        else:
-            return None
-        """
         i = 0
         j = 0
         result=[]
         while(i<int(list[0])):
-            #print(i)
-            #print(j)
             result.append(list[j+1])
-            #result[j]=list[j+1]
             j+=1
-            #print("b")
             i+=len(list[j])
             i+=1
-        #print(result)
         return result
-
     except Exception as e:
         print(f"[ERROR] can't resolve token: {e}")
         return None
@@ -66,200 +45,152 @@ def checkTokens(list):
 def saChat(conn):
     room=None
     buf=1024
-    matched=False
     defence=False
-    end=False
+    tokens = None
+    data = ""
+    timed_out = 30
     print(f"[THREAD] CREATE: {threading.currentThread().getName()}",flush=True)
-    while end==False:
-        #print("[debug] start roop_main")
-        while matched==False:
-            #print("[debug] start roop_menu")
-            try:
-                conn.settimeout(120.0)
-                data = conn.recv(buf).decode('utf-8')
-                #print(f"[debug] recv:{data}")
-                conn.settimeout(None)
-                tokens=data.split()
-                #受け取ったコマンドの文字数の整合性
-                tokens=checkTokens(tokens)
-                #print(f"[debug] tokens:{tokens}, len:{len(tokens)}")
-                if(tokens==None and data !=""):
-                    conn.send(bytes(shapeMsg("err msg solution"),"utf-8"))
-                    continue
-                elif data=="":
-                    end=True
-                    break
-                if tokens[0]=="show":
-                    conn.send(bytes(shapeMsg(showRooms()),"utf-8"))
-                elif tokens[0]=="quit":
-                    conn.send(bytes(shapeMsg("end connection"),"utf-8"))
-                    #print("[debug] recv quit")
-                    end=True
-                    break
-                elif tokens[0]=="create"and (len(tokens)==3 or len(tokens)==4):
-                    if len(tokens)==4:
-                        pwd=tokens[3]
-                    else:
-                        pwd=None
-                    if createRoom(tokens[1],tokens[2],pwd)==True:
-                        room=rl.searchRoom(tokens[1])
-                        #conn.send(bytes(shapeMsg(f"acc"),"utf-8"))
-                        defence=True
-                        i=0
-                        while True:
-                            sleep(1)
-                            try:
-                                conn.setblocking(False)
-                                if(conn.recv(1024).decode("utf-8").split()[1]=="exit"):
-                                    rl.closeRoom(room.name)
-                                    end = True
-                                    break
-                                    #conn.send(bytes(shapeMsg(f"acc"),"utf-8"))
-                                conn.setblocking(True)
-                            except Exception as e:
-                                pass
-                            if room.num==2:
-                                matched=True
-                                conn.send(bytes(shapeMsg(f"matching {room.user2}"),"utf-8"))
-                                break
-                            elif i>120:
-                                conn.send(bytes(shapeMsg(f"err matching timeout"),"utf-8"))
-                                rl.closeRoom(room.name)
-                                break
-                            i+=1
-                    else:
-                        conn.send(bytes(shapeMsg(f"err creation refused"),"utf-8"))
-                elif tokens[0]=="join" and (len(tokens)==3 or len(tokens)==4):
-                    if len(tokens)==4:
-                        pwd=tokens[3]
-                    else: pwd=None
-                    if rl.joinRoom(tokens[1],tokens[2],pwd)==True:
-                        matched=True
-                        room=rl.searchRoom(tokens[1])
-                        #conn.send(bytes(shapeMsg(f"acc"),"utf-8"))
-                        defence=False
-                    else:
-                        conn.send(bytes(shapeMsg(f"err wrong name or pwd"),"utf-8"))
-                elif tokens[0]=="chk_join":
-                    if len(tokens)==4:
-                        pwd=tokens[3]
-                    else: pwd=None
-                    roomInfo = rl.searchRoom(tokens[1])
-                    if(roomInfo!=None):
-                        if roomInfo.pwd==pwd:
-                            conn.send(bytes(shapeMsg(f"ok join {tokens[1]} {tokens[2]} {pwd}"),"utf-8"))
-                            continue
-                    conn.send(bytes(shapeMsg(f"err wrong _room_or_password"),"utf-8"))
-                elif tokens[0]=="chk_create":
-                    if rl.searchRoom(tokens[1])==None:
-                        conn.send(bytes(shapeMsg(f"ok create_{tokens[1]}"),"utf-8"))
-                        continue
-                    conn.send(bytes(shapeMsg(f"err {tokens[1]}_already_exists"),"utf-8"))
+    
+    try:
+        conn.settimeout(timed_out)
+        data = conn.recv(buf).decode('utf-8')
+        conn.settimeout(None)
+        tokens = checkTokens(data.split())
+    except Exception as e:
+        print(f"[ERROR] {e}")
+
+    if(tokens==None and data!= ""):
+        conn.send(bytes(shapeMsg("err msg solution"),"utf-8"))
+    elif(data==""): pass
+
+    else:
+        if tokens[0] == "show":
+            conn.send(bytes(shapeMsg(showRooms()),"utf-8"))
+        elif tokens[0]=="chk_join":
+            if len(tokens)==4:
+                pwd=tokens[3]
+            else: pwd=None
+            roomInfo = rl.searchRoom(tokens[1])
+            if(roomInfo!=None):
+                if roomInfo.pwd==pwd:
+                    conn.send(bytes(shapeMsg(f"ok join {tokens[1]} {tokens[2]} {pwd}"),"utf-8"))
                 else:
-                    conn.send(bytes(shapeMsg(f"err unknown_command"),"utf-8"))
-            except socket.error as e:
-                print(f"[ERROR] SOCKET ERROR: {e}")
-                rl.closeRoom(room.name)
-                break
-        # Matching True
-        #print("[debug] end matching roop")
-        while defence==False and matched==True and end == False:
-            #print("[debug] start attack roop")
-            if rl.searchRoom(room.name)==None:
-                matched=False
-                conn.send(bytes(shapeMsg(f"err disconnected"),"utf-8"))
-                break
-            try:
-                conn.settimeout(120.0)
-                data = conn.recv(buf).decode('utf-8')
-                conn.settimeout(None)
-                tokens = data.split()
-                #print(tokens)
-                tokens = checkTokens(tokens)
-                if(tokens==None):
-                    #conn.send(bytes(shapeMsg("err msg solution"),"utf-8"))
-                    end=True
-                    break
-                if len(tokens)==0:
-                    end=True
-                    break
-                if tokens[0]=="exit":
-                    #print("[debug] exit room")
-                    rl.setCtr(room.name,"ctr [2,1,0]")
-                    rl.exitRoom(room.name)
-                    matched=False
-                    break
-                elif tokens[0]=="ctr":
-                    rl.setCtr(room.name,tokens[1])
-                else:
-                    end=True
-                    break
-                #print(f"[ROOM] {room.name}_ctr:{room.ctr}")
-            except socket.error as e:
-                print(f"[ERROR] SOCKET ERROR: {e}")
-                rl.setCtr(room.name,"ctr [2,1,0]")
-                end=True
-                rl.exitRoom(room.name)
-                break
-        c_prev="ctr [2,1,0]"
-        i=0
-        while defence==True and matched==True and end == False:
-            #切断の検知
-            try:
-                conn.setblocking(False)
-                msg = conn.recv(1024).decode("utf-8")
-                if msg=="":
-                    rl.closeRoom(room.name)
-                    end=True
-                    break
-                tokens = msg.split()
-                if checkTokens(tokens)[0]=="exit":
-                    rl.closeRoom(room.name)
-                    matched = False
-                    break
-                else:
+                    conn.send(bytes(shapeMsg(f"err wrong password"),"utf-8"))
+            else:
+                conn.send(bytes(shapeMsg(f"err room not exist"),"utf-8"))
+        elif tokens[0]=="chk_create":
+            if rl.searchRoom(tokens[1])==None:
+                conn.send(bytes(shapeMsg(f"ok create_{tokens[1]}"),"utf-8"))
+            else:
+                conn.send(bytes(shapeMsg(f"err {tokens[1]}_already_exists"),"utf-8"))
+        elif tokens[0]=="create"and (len(tokens)==3 or len(tokens)==4):
+            if len(tokens) == 4:
+                pwd = tokens[3]
+            else: pwd = None
+            room = rl.createRoom(tokens[1],tokens[2],pwd)
+            i = 0
+            matching = False
+            while i < timed_out:
+                try:
+                    conn.setblocking(False)
+                    msg = conn.recv(buf).decode("utf-8")
+                    conn.setblocking(True)
+                    if msg == "":
+                        rl.closeRoom(room.name)
+                        break
+                    if msg.split()[1] == "exit":
+                        rl.closeRoom(room.name)
+                        break
+                except Exception as e:
                     pass
-                conn.setblocking(True)
-            except socket.error as e:
-                pass
-                #print(f"[debug] ERROR:{e}")
-            if room.num!=2:
-                matched=False
+                if room.num == 2:
+                    conn.send(bytes(shapeMsg(f"matching {room.user2}"),"utf-8"))
+                    matching = True
+                    break
+                if i > timed_out:
+                    conn.send(bytes(shapeMsg(f"err timeout"),"utf-8"))
+                    rl.closeRoom(room.name)
+                    break
+                sleep(1)
+            if matching == True:
+                c_prev = "ctr [2,1,0]"
+                i = 0
+                while True:
+                    try:
+                        conn.setblocking(False)
+                        msg = conn.recv(buf).decode("utf-8")
+                        conn.setblocking(True)
+                        if msg == "":
+                            rl.closeRoom(room.name)
+                            break
+                        tokens = checkTokens(msg.split())
+                        if tokens[0] == "exit":
+                            rl.closeRoom(room.name)
+                            break
+                    except Exception as e:
+                        pass
+                    if room.num != 2:
+                        rl.closeRoom(room.name)
+                        conn.send(bytes(shapeMsg(f"err disconnected"),"utf-8"))
+                        break
+                    c = rl.getCtr(room.name)
+                    if c != c_prev:
+                        conn.send(bytes(shapeMsg(f"ctr {c}"),"utf-8"))
+                        c_prev = c
+                        i = 0
+                    sleep(1 / 100)
+                    i += 1
+                    if i > 100 * 300:
+                        conn.send(bytes(shapeMsg(f"err TIMED_OUT {i}"),"utf-8"))
+                        rl.closeRoom(room.name)
+                        break
                 rl.closeRoom(room.name)
-                conn.send(bytes(shapeMsg(f"err disconnected"),"utf-8"))
-                break
-            c=rl.getCtr(room.name)
-            try:
-                if c!=c_prev:
-                    #print("[debug] ctr updated")
-                    conn.send(bytes(shapeMsg(f"ctr {c}"),"utf-8"))
-                    c_prev=c
-                    i=0
-                sleep(0.01)
-                i+=1
-            except socket.error as e:
-                print(f"[ERROR] SOCKET ERROR:{e}")
-                rl.closeRoom(room.name)
-                break
-            if i>120000:
-                conn.send(bytes(shapeMsg(f"err TIMED_OUT {i}"),"utf-8"))
-                rl.closeRoom(room.name)
-                matched=False
-                break
-    #print("[debug] end one roop")
-    if room!=None:
-        if defence==True:
-            rl.closeRoom(room.name)
-        else:
+        elif tokens[0]=="join" and (len(tokens)==3 or len(tokens)==4):
+            if len(tokens) == 4:
+                pwd = tokens[3]
+            else: pwd = None
+            rl.joinRoom(tokens[1],tokens[2],pwd)
+            room = rl.searchRoom(tokens[1])
+            while True:
+                if rl.searchRoom(room.name) == None:
+                    conn.send(bytes(shapeMsg(f"err disconnected"),"utf-8"))
+                    break
+                try:
+                    conn.settimeout(300)
+                    msg = conn.recv(buf).decode("utf-8")
+                    conn.settimeout(None)
+                    if msg == "":
+                        rl.setCtr(room.name, "ctr [2,1,0]")
+                        rl.exitRoom(room.name)
+                        break
+                    tokens = checkTokens(msg.split())
+                    if tokens == None:
+                        rl.setCtr(room.name, "ctr [2,1,0]")
+                        rl.exitRoom(room.name)
+                        break
+                    if tokens[0] == "exit":
+                        rl.setCtr(room.name, "ctr [2,1,0]")
+                        rl.exitRoom(room.name)
+                        break
+                    elif tokens[0] == "ctr":
+                        rl.setCtr(room.name, tokens[1])
+                    else:
+                        break
+                except Exception as e:
+                    rl.setCtr(room.name, "ctr [2,1,0]")
+                    rl.exitRoom(room.name)
+                    print(e)
+                    break
             rl.exitRoom(room.name)
+        else:
+            conn.send(bytes(shapeMsg(f"err unknown_command"),"utf-8"))
     print(f"[THREAD] CLOSE: {threading.currentThread().getName()}]")
 
 def main():
     s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
     s.bind((ip,port))
     s.listen(socket.SOMAXCONN)
-    createRoom("TestRoom","TestUser",None)
-    rl.joinRoom("TestRoom","TestUser2",None)
+    rl.createRoom("TestRoom","TestUser",None)
     with ThreadPoolExecutor(max_workers=100) as executor:
         while True:
             conn,addr = s.accept()
