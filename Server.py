@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from time import sleep
 from RoomManager import RoomManager as RoomList
 
-ip = "157.7.214.224"
+ip = ""
 print(ip)
 port = 19071
 rl = RoomList()
