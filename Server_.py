@@ -6,7 +6,7 @@ from time import sleep
 from RoomManager import RoomManager as RoomList
 
 #ip=socket.gethostbyname(socket.gethostname())
-ip="192.168.11.14"
+ip=""
 print(ip)
 port=19071
 rl=RoomList()
